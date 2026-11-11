@@ -119,7 +119,39 @@ Every edit that changes a snippet (via the API, the web form, or an import with
 as a version. Saving without changes stores nothing. At most 50 versions are
 kept per snippet and they are deleted with the snippet. Restoring saves the
 state it replaces first, so a restore can be undone. History is not part of
-JSON export, and the web pages do not show it yet (API only).
+JSON export.
+
+In the web UI, the **History** button on a snippet opens `/s/<id>/history`: each
+earlier version with a unified diff against the current body and a "Restore this
+version" button (a POST with the usual CSRF token).
+
+Captured with Flask's test client in an empty temporary directory (the
+timestamp and the random CSRF token are replaced by placeholders):
+
+```
+POST /new -> 302
+POST /s/1/edit -> 302
+GET /s/1/history -> 200
+<h1>History of Reverse a list</h1>
+<p><a href="/s/1">&larr; back to snippet</a></p>
+<section class="version">
+  <h2>Version 1</h2>
+  <p class="muted">saved <timestamp omitted></p>
+  <p class="muted">Changes from this version to the current one:</p>
+  <pre><code>--- version 1
++++ current
+@@ -1 +1 @@
+-items[::-1]
++list(reversed(items))
+</code></pre>
+  <form method="post" action="/s/1/history/1/restore" class="inline"
+        onsubmit="return confirm('Restore this version? The current one is kept in history.');">
+    <input type="hidden" name="csrf_token" value="<token>">
+    <button type="submit">Restore this version</button>
+  </form>
+</section>
+POST /s/1/history/1/restore -> 302 /s/1
+```
 
 Databases created by older versions are upgraded automatically on start (the
 `snippet_versions` table is added, existing snippets are untouched; history

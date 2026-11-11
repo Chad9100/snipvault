@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}History of {{ s.title }} - snipvault{% endblock %}
+{% block content %}
+<h1>History of {{ s.title }}</h1>
+<p><a href="{{ url_for('web.show', sid=s.id) }}">&larr; back to snippet</a></p>
+{% if not versions %}
+<p class="muted">No earlier versions yet. A version is stored each time the snippet is changed.</p>
+{% endif %}
+{% for v in versions %}
+<section class="version">
+  <h2>Version {{ v.id }}{% if v.title != s.title %} &ndash; {{ v.title }}{% endif %}</h2>
+  <p class="muted">saved {{ v.saved_at }}</p>
+  {% if v.diff %}
+  <p class="muted">Changes from this version to the current one:</p>
+  <pre><code>{{ v.diff }}</code></pre>
+  {% else %}
+  <p class="muted">Same body as the current version.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('web.restore', sid=s.id, vid=v.id) }}" class="inline"
+        onsubmit="return confirm('Restore this version? The current one is kept in history.');">
+    {{ csrf_field() }}
+    <button type="submit">Restore this version</button>
+  </form>
+</section>
+{% endfor %}
+{% endblock %}

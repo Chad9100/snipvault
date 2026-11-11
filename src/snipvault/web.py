@@ -84,6 +84,26 @@ def show(sid):
     return render_template("show.html", s=s)
 
 
+@bp.get("/s/<int:sid>/history")
+def history(sid):
+    conn = get_conn()
+    s = db.get(conn, sid)
+    if s is None:
+        abort(404)
+    versions = db.history(conn, sid)
+    for v in versions:
+        v["diff"] = db.version_diff(conn, sid, v["id"])
+    return render_template("history.html", s=s, versions=versions)
+
+
+@bp.post("/s/<int:sid>/history/<int:vid>/restore")
+def restore(sid, vid):
+    if not db.restore_version(get_conn(), sid, vid):
+        abort(404)
+    flash("Version restored.")
+    return redirect(url_for("web.show", sid=sid))
+
+
 @bp.get("/s/<int:sid>/edit")
 def edit(sid):
     s = db.get(get_conn(), sid)

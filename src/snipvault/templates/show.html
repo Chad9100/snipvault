@@ -7,6 +7,7 @@
 <div class="actions">
   <button type="button" data-copy-target="snippet-body">Copy</button>
   <a class="button" href="{{ url_for('web.edit', sid=s.id) }}">Edit</a>
+  <a class="button" href="{{ url_for('web.history', sid=s.id) }}">History</a>
   <form method="post" action="{{ url_for('web.remove', sid=s.id) }}" class="inline"
         onsubmit="return confirm('Delete this snippet?');">
     {{ csrf_field() }}
