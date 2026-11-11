@@ -224,9 +224,24 @@ def export_document(conn):
     return {"format": "snipvault", "version": 1, "snippets": export_all(conn)}
 
 
-def import_items(conn, items):
-    """Import snippets from a list, or from an export document. Validates
-    everything first so a bad file imports nothing. Returns the number imported."""
+DUPLICATE_MODES = ("add", "skip", "replace")
+
+
+def import_items(conn, items, on_duplicate="add"):
+    """Import snippets and return the number added (see import_report)."""
+    return import_report(conn, items, on_duplicate)["imported"]
+
+
+def import_report(conn, items, on_duplicate="add"):
+    """Import snippets from a list, or from an export document.
+
+    A duplicate is a snippet with the same title (case-insensitive) and
+    language as one already stored or earlier in the same file. ``on_duplicate``:
+    ``add`` imports it anyway, ``skip`` leaves the stored one alone, ``replace``
+    overwrites the stored one's body and tags. Validates everything first so a
+    bad file changes nothing. Returns {"imported", "skipped", "replaced"}."""
+    if on_duplicate not in DUPLICATE_MODES:
+        raise ValidationError("on_duplicate must be one of: " + ", ".join(DUPLICATE_MODES))
     if isinstance(items, dict) and items.get("format") == "snipvault":
         items = items.get("snippets")
     if not isinstance(items, list):
@@ -239,8 +254,23 @@ def import_items(conn, items):
             cleaned.append((clean(it), it.get("created_at"), it.get("updated_at")))
         except ValidationError as e:
             raise ValidationError(f"item {i}: {e}") from None
+    imported = skipped = replaced = 0
     for c, created, updated in cleaned:
         ts = now()
+        if on_duplicate != "add":
+            row = conn.execute(
+                "SELECT id FROM snippets WHERE lower(title) = ? AND language = ? "
+                "ORDER BY id LIMIT 1", (c["title"].lower(), c["language"])).fetchone()
+            if row:
+                if on_duplicate == "skip":
+                    skipped += 1
+                else:
+                    conn.execute("UPDATE snippets SET title=?, body=?, updated_at=? "
+                                 "WHERE id=?", (c["title"], c["body"], ts, row["id"]))
+                    _set_tags(conn, row["id"], c["tags"])
+                    replaced += 1
+                continue
+        imported += 1
         cur = conn.execute(
             "INSERT INTO snippets (title, language, body, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -249,4 +279,4 @@ def import_items(conn, items):
              updated if isinstance(updated, str) else (created if isinstance(created, str) else ts)))
         _set_tags(conn, cur.lastrowid, c["tags"])
     conn.commit()
-    return len(cleaned)
+    return {"imported": imported, "skipped": skipped, "replaced": replaced}

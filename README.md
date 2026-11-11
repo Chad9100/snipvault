@@ -74,6 +74,12 @@ in the title, body, language or a tag. It is not SQLite FTS5 (see ROADMAP).
 | GET | `/api/export` | export document |
 | POST | `/api/import` | export document or a bare list; all-or-nothing |
 
+Import takes `?on_duplicate=add|skip|replace` (default `add`; the web import
+page has the same choice). A duplicate is a snippet with the same title
+(case-insensitive) and language as one already stored or earlier in the file.
+`skip` keeps the stored one, `replace` overwrites its body and tags. The
+response is `{"imported", "skipped", "replaced"}`.
+
 Timestamps are UTC, taken from the machine's clock.
 
 ## Real output
@@ -99,6 +105,20 @@ $ curl -s -X DELETE -w http %{http_code} /api/snippets/2
 204
 $ curl -s /api/export
 {"format":"snipvault","snippets":[{"body":"items[::-1]","created_at":"2026-11-11T15:38:33Z","id":1,"language":"python","tags":["lists","python"],"title":"Reverse a list","updated_at":"2026-11-11T15:38:33Z"}],"version":1}
+```
+
+### Duplicate handling on import
+
+Captured with Flask's test client in an empty temporary directory (one stored
+snippet, then a two-snippet file whose first entry has the same title and
+language, imported with `skip` and then `replace`; the second run reports two
+replaced because the first run had already added "Find big files"):
+
+```
+$ import 1 snippet: {'imported': 1, 'replaced': 0, 'skipped': 0}
+$ import 2 snippets (1 duplicate) ?on_duplicate=skip: {"imported": 1, "replaced": 0, "skipped": 1}
+$ import 2 snippets (1 duplicate) ?on_duplicate=replace: {"imported": 0, "replaced": 2, "skipped": 0}
+bodies: ['find . -size +100M', 'list(reversed(items))']
 ```
 
 ## Development

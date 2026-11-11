@@ -26,13 +26,78 @@ def test_api_export_empty(client):
 def test_api_import_document(client):
     doc = {"format": "snipvault", "version": 1, "snippets": [{"title": "I", "tags": ["z"]}]}
     r = client.post("/api/import", json=doc)
-    assert r.status_code == 201 and r.get_json() == {"imported": 1}
+    assert r.status_code == 201 and r.get_json() == {"imported": 1, "skipped": 0, "replaced": 0}
     assert client.get("/api/snippets/1").get_json()["tags"] == ["z"]
 
 
 def test_api_import_bare_list(client):
     r = client.post("/api/import", json=[{"title": "a"}, {"title": "b"}])
-    assert r.get_json() == {"imported": 2}
+    assert r.get_json()["imported"] == 2
+
+
+DUP = [{"title": "Reverse", "language": "Python", "body": "new", "tags": ["n"]},
+       {"title": "Other", "body": "o"}]
+
+
+def seed(client):
+    mk(client, title="reverse", body="old", tags=["a"])
+
+
+def test_dup_default_adds(client):
+    seed(client)
+    r = client.post("/api/import", json=DUP)
+    assert r.get_json() == {"imported": 2, "skipped": 0, "replaced": 0}
+    assert len(client.get("/api/snippets").get_json()) == 3
+
+
+def test_dup_skip(client):
+    seed(client)
+    r = client.post("/api/import?on_duplicate=skip", json=DUP)
+    assert r.get_json() == {"imported": 1, "skipped": 1, "replaced": 0}
+    assert client.get("/api/snippets/1").get_json()["body"] == "old"
+
+
+def test_dup_replace(client):
+    seed(client)
+    r = client.post("/api/import?on_duplicate=replace", json=DUP)
+    assert r.get_json() == {"imported": 1, "skipped": 0, "replaced": 1}
+    s = client.get("/api/snippets/1").get_json()
+    assert s["body"] == "new" and s["tags"] == ["n"] and s["title"] == "Reverse"
+    assert len(client.get("/api/snippets").get_json()) == 2
+
+
+def test_dup_within_file(client):
+    r = client.post("/api/import?on_duplicate=skip",
+                    json=[{"title": "x"}, {"title": "X"}])
+    assert r.get_json() == {"imported": 1, "skipped": 1, "replaced": 0}
+
+
+def test_dup_language_differs_is_not_duplicate(client):
+    seed(client)
+    r = client.post("/api/import?on_duplicate=skip", json=[{"title": "reverse", "language": "sh"}])
+    assert r.get_json()["imported"] == 1
+
+
+def test_dup_bad_mode(client):
+    r = client.post("/api/import?on_duplicate=nope", json=[{"title": "a"}])
+    assert r.status_code == 400
+    assert client.get("/api/snippets").get_json() == []
+
+
+def test_dup_bad_item_changes_nothing(client):
+    seed(client)
+    r = client.post("/api/import?on_duplicate=replace", json=[DUP[0], {"body": "x"}])
+    assert r.status_code == 400
+    assert client.get("/api/snippets/1").get_json()["body"] == "old"
+
+
+def test_web_import_skip_message(client):
+    seed(client)
+    data = {"file": (io.BytesIO(json.dumps(DUP).encode()), "x.json"),
+            "csrf_token": token(client, "/import"), "on_duplicate": "skip"}
+    r = client.post("/import", data=data, content_type="multipart/form-data",
+                    follow_redirects=True)
+    assert b"Skipped 1 duplicate" in r.data
 
 
 def test_api_import_bad_item_imports_nothing(client):

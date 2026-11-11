@@ -87,8 +87,8 @@ def import_():
     data = request.get_json(silent=True)
     if data is None:
         raise db.ValidationError("request body must be valid JSON")
-    n = db.import_items(get_conn(), data)
-    return jsonify(imported=n), 201
+    mode = request.args.get("on_duplicate", "add")
+    return jsonify(db.import_report(get_conn(), data, mode)), 201
 
 
 @bp.get("/tags")

@@ -7,7 +7,12 @@
 <form method="post" action="{{ url_for('web.import_upload') }}" enctype="multipart/form-data" class="stack">
   {{ csrf_field() }}
   <label>Import a snipvault JSON file <input type="file" name="file" accept=".json,application/json"></label>
+  <label>If a snippet with the same title and language exists
+    <select name="on_duplicate">
+      <option value="add">add it anyway</option>
+      <option value="skip">skip it</option>
+      <option value="replace">replace its body and tags</option>
+    </select></label>
   <button type="submit">Import</button>
 </form>
-<p class="muted">Imported snippets are added; existing ones are never overwritten.</p>
 {% endblock %}
