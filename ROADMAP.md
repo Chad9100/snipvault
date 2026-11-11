@@ -16,4 +16,5 @@ Ideas for after v0.1, roughly in priority order.
    talking to the local database or the REST API.
 7. **Import from other tools.** GitHub Gists and plain folders of files.
 8. **Duplicate detection** on import, with a skip/replace choice.
-9. **Backups.** `snipvault backup` using the SQLite backup API.
+
+Done: `snipvault backup` (SQLite backup API).

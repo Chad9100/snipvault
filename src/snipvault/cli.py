@@ -20,11 +20,26 @@ def build_parser():
     s.add_argument("--port", type=int, default=5000, help="port (default: 5000)")
     s.add_argument("--allow-remote", action="store_true",
                    help="required to bind to a non-local address (there is no login!)")
+    b = sub.add_parser("backup", help="copy the database to a file (safe while serving)")
+    b.add_argument("dest", help="backup file to write")
+    b.add_argument("--db", default=None,
+                   help="database file (default: $SNIPVAULT_DB or ./snipvault.db)")
+    b.add_argument("--force", action="store_true", help="overwrite an existing backup file")
     return p
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if args.command == "backup":
+        from .db import BackupError, backup
+        db_path = args.db or os.environ.get("SNIPVAULT_DB", "snipvault.db")
+        try:
+            n = backup(db_path, args.dest, overwrite=args.force)
+        except BackupError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print(f"backed up {n} snippet(s) from {db_path} to {args.dest}")
+        return 0
     if args.host not in LOCAL_HOSTS and not args.allow_remote:
         print(f"error: refusing to bind to {args.host}: snipvault has no login. "
               "Pass --allow-remote if you really mean it.", file=sys.stderr)

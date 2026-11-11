@@ -51,6 +51,45 @@ def init_db(path):
         conn.close()
 
 
+class BackupError(Exception):
+    pass
+
+
+def backup(src_path, dest_path, overwrite=False):
+    """Copy a database with SQLite's online backup API (safe while the app is
+    running). Returns the number of snippets in the copy."""
+    import os
+    if not os.path.isfile(src_path):
+        raise BackupError(f"database not found: {src_path}")
+    if os.path.exists(dest_path):
+        if os.path.isdir(dest_path):
+            raise BackupError(f"destination is a directory: {dest_path}")
+        if os.path.samefile(src_path, dest_path):
+            raise BackupError("destination is the database itself")
+        if not overwrite:
+            raise BackupError(f"destination exists (use --force to overwrite): {dest_path}")
+    parent = os.path.dirname(os.path.abspath(dest_path))
+    if not os.path.isdir(parent):
+        raise BackupError(f"destination folder does not exist: {parent}")
+    tmp = dest_path + ".part"
+    src = sqlite3.connect(src_path)
+    try:
+        dst = sqlite3.connect(tmp)
+        try:
+            src.backup(dst)
+            n = dst.execute("SELECT COUNT(*) FROM snippets").fetchone()[0]
+        finally:
+            dst.close()
+        os.replace(tmp, dest_path)
+    except sqlite3.Error as e:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise BackupError(f"backup failed: {e}") from None
+    finally:
+        src.close()
+    return n
+
+
 def parse_tags(value):
     """Accept a list or a comma separated string; return unique lowercase tags."""
     if value is None:

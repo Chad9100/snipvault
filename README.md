@@ -19,6 +19,33 @@ snipvault serve --port 8000 --db my-snippets.db
 The database file is created in the current directory (or `$SNIPVAULT_DB`).
 Python 3.10+.
 
+## Backups
+
+```
+snipvault backup nightly.db              # copies ./snipvault.db (or --db FILE)
+snipvault backup nightly.db --force      # overwrite an existing backup
+```
+
+This uses SQLite's online backup API, so it is safe to run while `serve` is
+running. It refuses to overwrite an existing file without `--force`, never
+touches the source, and writes to a temporary file first so a failed backup
+cannot leave a half-written copy. Real output from a database with two
+snippets (run in an empty temporary directory):
+
+```
+$ snipvault backup nightly.db
+backed up 2 snippet(s) from snipvault.db to nightly.db
+$ snipvault backup nightly.db
+error: destination exists (use --force to overwrite): nightly.db
+$ snipvault backup nightly.db --force
+backed up 2 snippet(s) from snipvault.db to nightly.db
+$ snipvault backup x.db --db missing.db
+error: database not found: missing.db
+```
+
+A backup is a normal snipvault database; restore it by pointing `--db` at it
+or copying it back over the original (with the server stopped).
+
 ## Security notes
 
 snipvault is a **local-only tool with no login**.
