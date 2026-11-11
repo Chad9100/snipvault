@@ -86,7 +86,9 @@ Timestamps are UTC, taken from the machine's clock.
 
 Captured by starting `snipvault serve --port 5057` in an empty temporary
 directory, running these curl commands against it, and stopping it. Nothing
-below was edited by hand.
+below was edited by hand. (The timestamps in this first block come from the
+machine clock of the capture PC, which ran about three hours fast, so they are
+not real UTC. The dry-run block further down does not show timestamps.)
 
 ```
 $ curl -s -X POST /api/snippets (create)
@@ -105,6 +107,28 @@ $ curl -s -X DELETE -w http %{http_code} /api/snippets/2
 204
 $ curl -s /api/export
 {"format":"snipvault","snippets":[{"body":"items[::-1]","created_at":"2026-11-11T15:38:33Z","id":1,"language":"python","tags":["lists","python"],"title":"Reverse a list","updated_at":"2026-11-11T15:38:33Z"}],"version":1}
+```
+
+### Import dry run
+
+Add `?dry_run=1` to `/api/import` (or tick "Dry run" on the web import page) to
+see what an import would do without saving anything. The import is carried out
+inside a transaction and rolled back, so the counts are exactly what a real run
+would give, including duplicates within the file. The response is 200 (a real
+import is 201) and adds `"dry_run": true` plus one `{"title", "language",
+"action"}` entry per item, where action is `add`, `skip` or `replace`. Invalid
+files are still rejected with 400.
+
+Captured with Flask's test client in an empty temporary directory (one stored
+snippet, then a file with a duplicate and a new snippet):
+
+```
+$ POST /api/import?on_duplicate=replace&dry_run=1 -> 200
+{"dry_run": true, "imported": 1, "items": [{"action": "replace", "language": "python", "title": "reverse a list"}, {"action": "add", "language": "bash", "title": "Find big files"}], "replaced": 1, "skipped": 0}
+$ GET /api/snippets (still 1 snippet)
+$ POST /api/import?on_duplicate=replace -> 201
+{"imported": 1, "replaced": 1, "skipped": 0}
+$ GET /api/snippets -> 2 snippets
 ```
 
 ### Duplicate handling on import

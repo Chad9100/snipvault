@@ -232,14 +232,19 @@ def import_items(conn, items, on_duplicate="add"):
     return import_report(conn, items, on_duplicate)["imported"]
 
 
-def import_report(conn, items, on_duplicate="add"):
+def import_report(conn, items, on_duplicate="add", dry_run=False):
     """Import snippets from a list, or from an export document.
 
     A duplicate is a snippet with the same title (case-insensitive) and
     language as one already stored or earlier in the same file. ``on_duplicate``:
     ``add`` imports it anyway, ``skip`` leaves the stored one alone, ``replace``
     overwrites the stored one's body and tags. Validates everything first so a
-    bad file changes nothing. Returns {"imported", "skipped", "replaced"}."""
+    bad file changes nothing. Returns {"imported", "skipped", "replaced"}.
+
+    With ``dry_run`` the import is carried out and then rolled back, so the
+    counts are exactly what a real import would give and nothing is stored. The
+    result also has "dry_run": True and "items", one {"title", "language",
+    "action"} per input item (action is add, skip or replace)."""
     if on_duplicate not in DUPLICATE_MODES:
         raise ValidationError("on_duplicate must be one of: " + ", ".join(DUPLICATE_MODES))
     if isinstance(items, dict) and items.get("format") == "snipvault":
@@ -255,13 +260,16 @@ def import_report(conn, items, on_duplicate="add"):
         except ValidationError as e:
             raise ValidationError(f"item {i}: {e}") from None
     imported = skipped = replaced = 0
+    plan = []
     for c, created, updated in cleaned:
         ts = now()
+        plan.append({"title": c["title"], "language": c["language"], "action": "add"})
         if on_duplicate != "add":
             row = conn.execute(
                 "SELECT id FROM snippets WHERE lower(title) = ? AND language = ? "
                 "ORDER BY id LIMIT 1", (c["title"].lower(), c["language"])).fetchone()
             if row:
+                plan[-1]["action"] = on_duplicate
                 if on_duplicate == "skip":
                     skipped += 1
                 else:
@@ -278,5 +286,10 @@ def import_report(conn, items, on_duplicate="add"):
              created if isinstance(created, str) else ts,
              updated if isinstance(updated, str) else (created if isinstance(created, str) else ts)))
         _set_tags(conn, cur.lastrowid, c["tags"])
-    conn.commit()
-    return {"imported": imported, "skipped": skipped, "replaced": replaced}
+    report = {"imported": imported, "skipped": skipped, "replaced": replaced}
+    if dry_run:
+        conn.rollback()
+        report.update(dry_run=True, items=plan)
+    else:
+        conn.commit()
+    return report

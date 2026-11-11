@@ -43,10 +43,14 @@ def import_upload():
             data = json.loads(f.read().decode("utf-8-sig"))
         except (ValueError, UnicodeDecodeError):
             raise db.ValidationError("file is not valid UTF-8 JSON") from None
-        r = db.import_report(get_conn(), data, request.form.get("on_duplicate", "add"))
+        dry = bool(request.form.get("dry_run"))
+        r = db.import_report(get_conn(), data, request.form.get("on_duplicate", "add"),
+                             dry_run=dry)
     except db.ValidationError as e:
         return render_template("import.html", error=str(e)), 400
     msg = f"Imported {r['imported']} snippet(s)."
+    if dry:
+        msg = f"Dry run, nothing saved. Would import {r['imported']} snippet(s)."
     if r["skipped"]:
         msg += f" Skipped {r['skipped']} duplicate(s)."
     if r["replaced"]:
