@@ -18,7 +18,7 @@ UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 def init_app(app):
     @app.before_request
     def _check_csrf():
-        if request.blueprint == "api":
+        if request.blueprint == "api" or request.path.startswith("/api/"):
             return
         token = session.get(FIELD)
         if not token:

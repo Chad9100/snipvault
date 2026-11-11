@@ -3,7 +3,7 @@ import os
 import secrets
 import sqlite3
 
-from flask import Flask, current_app, g
+from flask import Flask, current_app, g, jsonify, request
 
 from . import csrf, db
 
@@ -33,6 +33,17 @@ def create_app(db_path=None, secret_key=None):
 
     from .web import bp as web_bp
     app.register_blueprint(web_bp)
+    from .api import bp as api_bp
+    app.register_blueprint(api_bp, url_prefix="/api")
+
+    @app.errorhandler(404)
+    @app.errorhandler(405)
+    def _api_errors(e):
+        # Unrouted /api paths never reach the blueprint, so answer in JSON here.
+        if request.path.startswith("/api/"):
+            return jsonify(error=e.name.lower()), e.code
+        return e
+
     return app
 
 
