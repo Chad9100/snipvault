@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="layout">
+<aside>
+  <h2>Tags</h2>
+  {% if tags %}
+  <ul class="taglist">
+    {% for t, n in tags %}
+    <li><a href="{{ url_for('web.index', tag=t) }}"{% if t == tag %} class="active"{% endif %}>{{ t }}</a> <span class="muted">{{ n }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No tags yet.</p>{% endif %}
+</aside>
+<section>
+  {% if q or tag or language %}
+  <p class="muted">Showing {{ snippets|length }} result(s)
+    {% if q %}for "{{ q }}"{% endif %}{% if tag %} tagged <b>{{ tag }}</b>{% endif %}{% if language %} in <b>{{ language }}</b>{% endif %}
+    &middot; <a href="{{ url_for('web.index') }}">clear</a></p>
+  {% endif %}
+  {% for s in snippets %}
+  <article class="card">
+    <h3><a href="{{ url_for('web.show', sid=s.id) }}">{{ s.title }}</a>
+      {% if s.language %}<a class="lang" href="{{ url_for('web.index', language=s.language) }}">{{ s.language }}</a>{% endif %}</h3>
+    <pre><code>{{ s.body[:400] }}{% if s.body|length > 400 %}
+...{% endif %}</code></pre>
+    <p>{% for t in s.tags %}<a class="tag" href="{{ url_for('web.index', tag=t) }}">{{ t }}</a> {% endfor %}
+      <span class="muted">updated {{ s.updated_at }}</span></p>
+  </article>
+  {% else %}
+  <p>No snippets found. <a href="{{ url_for('web.new') }}">Create one</a>.</p>
+  {% endfor %}
+</section>
+</div>
+{% endblock %}

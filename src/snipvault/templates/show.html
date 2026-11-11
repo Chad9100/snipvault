@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ s.title }} - snipvault{% endblock %}
+{% block content %}
+<h1>{{ s.title }}</h1>
+<p>{% if s.language %}<span class="lang">{{ s.language }}</span>{% endif %}
+  {% for t in s.tags %}<a class="tag" href="{{ url_for('web.index', tag=t) }}">{{ t }}</a> {% endfor %}</p>
+<div class="actions">
+  <button type="button" data-copy-target="snippet-body">Copy</button>
+  <a class="button" href="{{ url_for('web.edit', sid=s.id) }}">Edit</a>
+  <form method="post" action="{{ url_for('web.remove', sid=s.id) }}" class="inline"
+        onsubmit="return confirm('Delete this snippet?');">
+    {{ csrf_field() }}
+    <button type="submit" class="danger">Delete</button>
+  </form>
+</div>
+<pre><code id="snippet-body">{{ s.body }}</code></pre>
+<p class="muted">created {{ s.created_at }} &middot; updated {{ s.updated_at }}</p>
+{% endblock %}

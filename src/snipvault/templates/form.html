@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if snippet.get('id') else 'New' }} snippet - snipvault{% endblock %}
+{% block content %}
+<h1>{{ 'Edit snippet' if snippet.get('id') else 'New snippet' }}</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="{{ action }}" class="stack">
+  {{ csrf_field() }}
+  <label>Title <input name="title" value="{{ snippet.get('title', '') }}" maxlength="200" required></label>
+  <label>Language <input name="language" value="{{ snippet.get('language', '') }}" maxlength="40" placeholder="python"></label>
+  <label>Tags (comma separated) <input name="tags" value="{{ snippet.get('tags', '') }}" placeholder="web, regex"></label>
+  <label>Body <textarea name="body" rows="16" spellcheck="false">{{ snippet.get('body', '') }}</textarea></label>
+  <div><button type="submit">Save</button>
+  <a href="{{ url_for('web.index') }}">Cancel</a></div>
+</form>
+{% endblock %}
