@@ -75,6 +75,31 @@ def delete_snippet(sid):
     return "", 204
 
 
+@bp.get("/snippets/<int:sid>/history")
+def snippet_history(sid):
+    h = db.history(get_conn(), sid)
+    return jsonify(h) if h is not None else _err("not found", 404)
+
+
+@bp.get("/snippets/<int:sid>/history/<int:vid>")
+def snippet_version(sid, vid):
+    conn = get_conn()
+    v = db.get_version(conn, sid, vid)
+    if v is None:
+        return _err("not found", 404)
+    if request.args.get("diff", "").lower() in ("1", "true", "yes"):
+        v["diff"] = db.version_diff(conn, sid, vid)
+    return jsonify(v)
+
+
+@bp.post("/snippets/<int:sid>/history/<int:vid>/restore")
+def restore_version(sid, vid):
+    conn = get_conn()
+    if not db.restore_version(conn, sid, vid):
+        return _err("not found", 404)
+    return jsonify(db.get(conn, sid))
+
+
 @bp.get("/export")
 def export():
     resp = jsonify(db.export_document(get_conn()))

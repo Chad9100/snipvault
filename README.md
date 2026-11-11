@@ -71,6 +71,9 @@ in the title, body, language or a tag. It is not SQLite FTS5 (see ROADMAP).
 | POST | `/api/snippets` | create, 201 |
 | GET / PUT / DELETE | `/api/snippets/<id>` | 404 as JSON if missing |
 | GET | `/api/tags` | tags with counts |
+| GET | `/api/snippets/<id>/history` | previous versions, newest first |
+| GET | `/api/snippets/<id>/history/<vid>[?diff=1]` | one version, optionally with a unified diff against the current body |
+| POST | `/api/snippets/<id>/history/<vid>/restore` | make a version current again |
 | GET | `/api/export` | export document |
 | POST | `/api/import` | export document or a bare list; all-or-nothing |
 
@@ -107,6 +110,41 @@ $ curl -s -X DELETE -w http %{http_code} /api/snippets/2
 204
 $ curl -s /api/export
 {"format":"snipvault","snippets":[{"body":"items[::-1]","created_at":"2026-11-11T15:38:33Z","id":1,"language":"python","tags":["lists","python"],"title":"Reverse a list","updated_at":"2026-11-11T15:38:33Z"}],"version":1}
+```
+
+### Snippet history
+
+Every edit that changes a snippet (via the API, the web form, or an import with
+`on_duplicate=replace`) first stores the previous title, language, body and tags
+as a version. Saving without changes stores nothing. At most 50 versions are
+kept per snippet and they are deleted with the snippet. Restoring saves the
+state it replaces first, so a restore can be undone. History is not part of
+JSON export, and the web pages do not show it yet (API only).
+
+Databases created by older versions are upgraded automatically on start (the
+`snippet_versions` table is added, existing snippets are untouched; history
+starts from the next edit).
+
+Captured with Flask's test client in an empty temporary directory (the
+`*_at` timestamps are omitted from this output on purpose):
+
+```
+$ POST /api/snippets -> 201
+{"body": "items[::-1]\n", "id": 1, "language": "python", "tags": ["lists"], "title": "Reverse a list"}
+$ PUT /api/snippets/1 (edit) -> 200
+{"body": "list(reversed(items))\n", "id": 1, "language": "python", "tags": ["lists"], "title": "Reverse a list"}
+$ GET /api/snippets/1/history -> 200
+[{"body": "items[::-1]\n", "id": 1, "language": "python", "tags": ["lists"], "title": "Reverse a list"}]
+$ GET /api/snippets/1/history/1?diff=1 -> 200
+--- version 1
++++ current
+@@ -1 +1 @@
+-items[::-1]
++list(reversed(items))
+$ POST /api/snippets/1/history/1/restore -> 200
+{"body": "items[::-1]\n", "id": 1, "language": "python", "tags": ["lists"], "title": "Reverse a list"}
+$ GET /api/snippets/1/history (restore is undoable) -> 200
+[{"body": "list(reversed(items))\n", "id": 2, "language": "python", "tags": ["lists"], "title": "Reverse a list"}, {"body": "items[::-1]\n", "id": 1, "language": "python", "tags": ["lists"], "title": "Reverse a list"}]
 ```
 
 ### Import dry run

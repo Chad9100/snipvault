@@ -18,7 +18,23 @@ CREATE TABLE IF NOT EXISTS tags (
     PRIMARY KEY (snippet_id, tag)
 );
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+CREATE TABLE IF NOT EXISTS snippet_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snippet_id INTEGER NOT NULL REFERENCES snippets(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    tags TEXT NOT NULL DEFAULT '',
+    saved_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_versions_snippet ON snippet_versions(snippet_id);
 """
+
+# Schema version stored in PRAGMA user_version. 0 = databases created before
+# snippet history existed (no snippet_versions table); init_db upgrades them in
+# place, keeping every snippet.
+SCHEMA_VERSION = 1
+MAX_VERSIONS = 50
 
 MAX_TITLE = 200
 MAX_BODY = 200_000
@@ -46,6 +62,7 @@ def init_db(path):
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
     finally:
         conn.close()
@@ -167,8 +184,84 @@ def get(conn, sid):
     return _row(conn, r) if r else None
 
 
+def _save_version(conn, sid):
+    """Store the current state of a snippet as a history entry, unless it is
+    identical to the latest one. Keeps at most MAX_VERSIONS per snippet."""
+    cur = get(conn, sid)
+    if cur is None:
+        return
+    tags = ",".join(cur["tags"])
+    last = conn.execute(
+        "SELECT title, language, body, tags FROM snippet_versions "
+        "WHERE snippet_id = ? ORDER BY id DESC LIMIT 1", (sid,)).fetchone()
+    if last and tuple(last) == (cur["title"], cur["language"], cur["body"], tags):
+        return
+    conn.execute(
+        "INSERT INTO snippet_versions (snippet_id, title, language, body, tags, saved_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (sid, cur["title"], cur["language"], cur["body"], tags, cur["updated_at"]))
+    conn.execute(
+        "DELETE FROM snippet_versions WHERE snippet_id = ? AND id NOT IN "
+        "(SELECT id FROM snippet_versions WHERE snippet_id = ? ORDER BY id DESC LIMIT ?)",
+        (sid, sid, MAX_VERSIONS))
+
+
+def _version_dict(r):
+    d = dict(r)
+    d["tags"] = [t for t in d["tags"].split(",") if t]
+    return d
+
+
+def history(conn, sid):
+    """Previous versions of a snippet, newest first, or None if it does not exist."""
+    if get(conn, sid) is None:
+        return None
+    return [_version_dict(r) for r in conn.execute(
+        "SELECT id, title, language, body, tags, saved_at FROM snippet_versions "
+        "WHERE snippet_id = ? ORDER BY id DESC", (sid,))]
+
+
+def get_version(conn, sid, vid):
+    r = conn.execute(
+        "SELECT id, title, language, body, tags, saved_at FROM snippet_versions "
+        "WHERE snippet_id = ? AND id = ?", (sid, vid)).fetchone()
+    return _version_dict(r) if r else None
+
+
+def version_diff(conn, sid, vid):
+    """Unified diff of a stored version against the snippet's current body."""
+    import difflib
+    v, cur = get_version(conn, sid, vid), get(conn, sid)
+    if v is None or cur is None:
+        return None
+    return "".join(difflib.unified_diff(
+        v["body"].splitlines(keepends=True), cur["body"].splitlines(keepends=True),
+        fromfile=f"version {vid}", tofile="current"))
+
+
+def restore_version(conn, sid, vid):
+    """Make a stored version current again. The state being replaced is itself
+    saved to history first, so a restore can be undone. Returns False if the
+    snippet or version is missing."""
+    v = get_version(conn, sid, vid)
+    if v is None or get(conn, sid) is None:
+        return False
+    _save_version(conn, sid)
+    conn.execute("UPDATE snippets SET title=?, language=?, body=?, updated_at=? WHERE id=?",
+                 (v["title"], v["language"], v["body"], now(), sid))
+    _set_tags(conn, sid, v["tags"])
+    conn.commit()
+    return True
+
+
 def update(conn, sid, data):
     c = clean(data)
+    old = get(conn, sid)
+    if old is None:
+        return False
+    if (old["title"], old["language"], old["body"], old["tags"]) != (
+            c["title"], c["language"], c["body"], sorted(c["tags"])):
+        _save_version(conn, sid)
     cur = conn.execute(
         "UPDATE snippets SET title=?, language=?, body=?, updated_at=? WHERE id=?",
         (c["title"], c["language"], c["body"], now(), sid))
@@ -273,6 +366,7 @@ def import_report(conn, items, on_duplicate="add", dry_run=False):
                 if on_duplicate == "skip":
                     skipped += 1
                 else:
+                    _save_version(conn, row["id"])
                     conn.execute("UPDATE snippets SET title=?, body=?, updated_at=? "
                                  "WHERE id=?", (c["title"], c["body"], ts, row["id"]))
                     _set_tags(conn, row["id"], c["tags"])
