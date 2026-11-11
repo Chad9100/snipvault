@@ -1,5 +1,8 @@
 """HTML views."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+import json
+
+from flask import (Blueprint, Response, abort, flash, redirect, render_template,
+                   request, url_for)
 
 from . import db
 from .app import get_conn
@@ -16,6 +19,35 @@ def index():
     snippets = db.search(conn, q, tag or None, language or None)
     return render_template("index.html", snippets=snippets, q=q, tag=tag,
                            language=language, tags=db.tag_counts(conn))
+
+
+@bp.get("/export")
+def export():
+    body = json.dumps(db.export_document(get_conn()), indent=2, ensure_ascii=False)
+    return Response(body, mimetype="application/json", headers={
+        "Content-Disposition": 'attachment; filename="snipvault-export.json"'})
+
+
+@bp.get("/import")
+def import_form():
+    return render_template("import.html", error=None)
+
+
+@bp.post("/import")
+def import_upload():
+    f = request.files.get("file")
+    try:
+        if f is None or not f.filename:
+            raise db.ValidationError("choose a JSON file to import")
+        try:
+            data = json.loads(f.read().decode("utf-8-sig"))
+        except (ValueError, UnicodeDecodeError):
+            raise db.ValidationError("file is not valid UTF-8 JSON") from None
+        n = db.import_items(get_conn(), data)
+    except db.ValidationError as e:
+        return render_template("import.html", error=str(e)), 400
+    flash(f"Imported {n} snippet(s).")
+    return redirect(url_for("web.index"))
 
 
 @bp.get("/new")

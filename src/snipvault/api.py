@@ -75,6 +75,22 @@ def delete_snippet(sid):
     return "", 204
 
 
+@bp.get("/export")
+def export():
+    resp = jsonify(db.export_document(get_conn()))
+    resp.headers["Content-Disposition"] = 'attachment; filename="snipvault-export.json"'
+    return resp
+
+
+@bp.post("/import")
+def import_():
+    data = request.get_json(silent=True)
+    if data is None:
+        raise db.ValidationError("request body must be valid JSON")
+    n = db.import_items(get_conn(), data)
+    return jsonify(imported=n), 201
+
+
 @bp.get("/tags")
 def tags():
     return jsonify([{"tag": t, "count": n} for t, n in db.tag_counts(get_conn())])

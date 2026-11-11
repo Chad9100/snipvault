@@ -181,9 +181,15 @@ def export_all(conn):
     return [get(conn, r["id"]) for r in conn.execute("SELECT id FROM snippets ORDER BY id")]
 
 
+def export_document(conn):
+    return {"format": "snipvault", "version": 1, "snippets": export_all(conn)}
+
+
 def import_items(conn, items):
-    """Import a list of snippet dicts. Validates everything first so a bad file
-    imports nothing. Returns the number imported."""
+    """Import snippets from a list, or from an export document. Validates
+    everything first so a bad file imports nothing. Returns the number imported."""
+    if isinstance(items, dict) and items.get("format") == "snipvault":
+        items = items.get("snippets")
     if not isinstance(items, list):
         raise ValidationError("import data must be a list of snippets")
     cleaned = []

@@ -13,6 +13,7 @@
     <input type="search" name="q" value="{{ q or '' }}" placeholder="Search snippets" aria-label="Search">
     <button type="submit">Search</button>
   </form>
+  <a href="{{ url_for('web.import_form') }}">Import / export</a>
   <a class="button" href="{{ url_for('web.new') }}">New snippet</a>
 </header>
 <main>
