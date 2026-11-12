@@ -15,6 +15,12 @@
   </form>
   <a href="{{ url_for('web.import_form') }}">Import / export</a>
   <a class="button" href="{{ url_for('web.new') }}">New snippet</a>
+  {% if config.ACCESS_TOKEN and request.endpoint != 'auth.login' and request.endpoint != 'auth.login_post' %}
+  <form class="logout" action="{{ url_for('auth.logout') }}" method="post">
+    {{ csrf_field() }}
+    <button type="submit">Log out</button>
+  </form>
+  {% endif %}
 </header>
 <main>
 {% for m in get_flashed_messages() %}<p class="flash">{{ m }}</p>{% endfor %}

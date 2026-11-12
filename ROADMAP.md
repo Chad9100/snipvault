@@ -15,6 +15,6 @@ Ideas for after v0.1, roughly in priority order.
 7. **Import and export as a folder of files.**
 
 Done: optional shared access token (`--token` / `$SNIPVAULT_TOKEN`, login page
-and bearer header); `snipvault backup` (SQLite backup API); duplicate handling on import
+and bearer header) with a "Log out" button in the page header; `snipvault backup` (SQLite backup API); duplicate handling on import
 (`on_duplicate=add|skip|replace`); import dry run (`dry_run=1`); snippet history in the REST API (versions on edit,
 unified diff, restore) and in the web UI (History page with diffs and restore).

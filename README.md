@@ -89,6 +89,25 @@ Location: /login?next=/
 
 Static files stay public; everything else needs the token.
 
+While a token is set and you are signed in, every page header shows a "Log out"
+button (a POST form with the usual CSRF token; it is not shown on the login
+page or when no token is configured). Captured from the same kind of run, after
+signing in with `curl` (the CSRF value is replaced by a placeholder):
+
+```
+$ curl -s -b cookies / | grep -A3 'class="logout"'
+  <form class="logout" action="/logout" method="post">
+    <input type="hidden" name="csrf_token" value="<token>">
+    <button type="submit">Log out</button>
+  </form>
+$ curl -si -b cookies -d "csrf_token=<token>" /logout
+HTTP/1.1 302 FOUND
+Location: /login
+$ curl -si -b cookies /
+HTTP/1.1 302 FOUND
+Location: /login?next=/
+```
+
 ## Search
 
 Search is case-insensitive substring matching: every word you type must appear

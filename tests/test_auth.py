@@ -73,6 +73,22 @@ def test_logout(locked):
     assert html
 
 
+def test_logout_button_only_when_signed_in_with_token(locked, client):
+    c = locked.test_client()
+    assert 'action="/logout"' not in c.get("/login").get_data(as_text=True)
+    c.post("/login", data={"token": "s3cret", "csrf_token": _csrf(c)})
+    page = c.get("/").get_data(as_text=True)
+    assert 'action="/logout"' in page and "Log out" in page
+    # clicking it (the form's own csrf token) signs the browser out
+    tok = re.search(r'action="/logout".*?name="csrf_token" value="([^"]+)"',
+                    page, re.S).group(1)
+    r = c.post("/logout", data={"csrf_token": tok})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/login")
+    assert c.get("/").status_code == 302
+    # no token configured: no button
+    assert "Log out" not in client.get("/").get_data(as_text=True)
+
+
 def test_static_stays_public(locked):
     assert locked.test_client().get("/static/style.css").status_code == 200
 
