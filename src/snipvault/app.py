@@ -14,7 +14,7 @@ def get_conn():
     return g.conn
 
 
-def create_app(db_path=None, secret_key=None):
+def create_app(db_path=None, secret_key=None, token=None):
     app = Flask(__name__)
     app.config["DATABASE"] = db_path or os.environ.get("SNIPVAULT_DB", "snipvault.db")
     app.config["SECRET_KEY"] = secret_key or secrets.token_hex(32)
@@ -29,7 +29,10 @@ def create_app(db_path=None, secret_key=None):
         if conn is not None:
             conn.close()
 
+    app.config["ACCESS_TOKEN"] = token or os.environ.get("SNIPVAULT_TOKEN") or None
     csrf.init_app(app)
+    from . import auth
+    auth.init_app(app)
 
     from .web import bp as web_bp
     app.register_blueprint(web_bp)

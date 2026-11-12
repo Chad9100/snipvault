@@ -20,6 +20,9 @@ def build_parser():
     s.add_argument("--port", type=int, default=5000, help="port (default: 5000)")
     s.add_argument("--allow-remote", action="store_true",
                    help="required to bind to a non-local address (there is no login!)")
+    s.add_argument("--token", default=None,
+                   help="require this access token (default: $SNIPVAULT_TOKEN; "
+                        "prefer the variable, arguments show up in process lists)")
     b = sub.add_parser("backup", help="copy the database to a file (safe while serving)")
     b.add_argument("dest", help="backup file to write")
     b.add_argument("--db", default=None,
@@ -40,15 +43,17 @@ def main(argv=None):
             return 1
         print(f"backed up {n} snippet(s) from {db_path} to {args.dest}")
         return 0
+    token = args.token or os.environ.get("SNIPVAULT_TOKEN") or None
     if args.host not in LOCAL_HOSTS and not args.allow_remote:
         print(f"error: refusing to bind to {args.host}: snipvault has no login. "
               "Pass --allow-remote if you really mean it.", file=sys.stderr)
         return 2
     from .app import create_app
     db_path = args.db or os.environ.get("SNIPVAULT_DB", "snipvault.db")
-    app = create_app(db_path)
+    app = create_app(db_path, token=token)
     print(f"snipvault {__version__} serving {os.path.abspath(db_path)} "
-          f"at http://{args.host}:{args.port}/", flush=True)
+          f"at http://{args.host}:{args.port}/"
+          f"{' (access token required)' if token else ''}", flush=True)
     app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
     return 0
 

@@ -52,11 +52,42 @@ snipvault is a **local-only tool with no login**.
 
 - It binds to `127.0.0.1` by default and refuses any other address unless you
   pass `--allow-remote`. Do not expose it to a network you do not trust.
+- Optional access token: start with `SNIPVAULT_TOKEN=... snipvault serve` (or
+  `--token`, though arguments show up in process lists). Browsers sign in at
+  `/login`; API clients send `Authorization: Bearer <token>`. It is one shared
+  secret over plain HTTP, so it is not a substitute for HTTPS on an untrusted
+  network. See "Access token" below.
 - HTML forms are protected with a per-session CSRF token; a POST without it is
   rejected with 400.
 - `/api` writes require `Content-Type: application/json`, which a cross-site
   HTML form cannot send (so a malicious web page cannot forge them).
 - Snippet text is always HTML-escaped when displayed.
+
+## Access token
+
+Captured from a real run (`SNIPVAULT_TOKEN=hunter2 snipvault serve --port 5061`
+in an empty temporary directory, since stopped):
+
+```
+$ SNIPVAULT_TOKEN=hunter2 snipvault serve --port 5061
+snipvault 0.1.0 serving snipvault.db at http://127.0.0.1:5061/ (access token required)
+$ curl -si /api/tags
+HTTP/1.1 401 UNAUTHORIZED
+Content-Type: application/json
+WWW-Authenticate: Bearer
+Vary: Cookie
+
+{"error":"authentication required"}
+$ curl -si -H "Authorization: Bearer wrong" /api/tags
+HTTP/1.1 401 UNAUTHORIZED
+$ curl -s -H "Authorization: Bearer hunter2" /api/tags
+[]
+$ curl -si /
+HTTP/1.1 302 FOUND
+Location: /login?next=/
+```
+
+Static files stay public; everything else needs the token.
 
 ## Search
 
