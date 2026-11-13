@@ -12,9 +12,9 @@ Ideas for after v0.1, roughly in priority order.
    talking to the local database or the REST API.
 5. **Import from other tools.** GitHub Gists and plain folders of files.
 6. **Fuzzy duplicate detection** by body similarity, not just title.
-7. **Import and export as a folder of files.**
 
-Done: optional shared access token (`--token` / `$SNIPVAULT_TOKEN`, login page
+Done: `snipvault export-dir` / `import-dir` (folder of files with a small
+header); optional shared access token (`--token` / `$SNIPVAULT_TOKEN`, login page
 and bearer header) with a "Log out" button in the page header; `snipvault backup` (SQLite backup API); duplicate handling on import
 (`on_duplicate=add|skip|replace`); import dry run (`dry_run=1`); snippet history in the REST API (versions on edit,
 unified diff, restore) and in the web UI (History page with diffs and restore).

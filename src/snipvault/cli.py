@@ -28,11 +28,58 @@ def build_parser():
     b.add_argument("--db", default=None,
                    help="database file (default: $SNIPVAULT_DB or ./snipvault.db)")
     b.add_argument("--force", action="store_true", help="overwrite an existing backup file")
+    e = sub.add_parser("export-dir", help="write every snippet to a folder of files")
+    e.add_argument("folder", help="folder to write (created if missing)")
+    e.add_argument("--db", default=None,
+                   help="database file (default: $SNIPVAULT_DB or ./snipvault.db)")
+    e.add_argument("--force", action="store_true", help="overwrite files that already exist")
+    i = sub.add_parser("import-dir", help="import a folder of files as snippets")
+    i.add_argument("folder", help="folder to read")
+    i.add_argument("--db", default=None,
+                   help="database file (default: $SNIPVAULT_DB or ./snipvault.db)")
+    i.add_argument("--on-duplicate", choices=("add", "skip", "replace"), default="add",
+                   help="what to do with a same title and language (default: add)")
+    i.add_argument("--dry-run", action="store_true", help="show the result without saving")
     return p
+
+
+def _folder_command(args):
+    from . import db
+    from .folder import FolderError, export_folder, read_folder
+    db_path = args.db or os.environ.get("SNIPVAULT_DB", "snipvault.db")
+    try:
+        if args.command == "export-dir":
+            if not os.path.exists(db_path):
+                raise FolderError(f"database not found: {db_path}")
+            conn = db.connect(db_path)
+            try:
+                names = export_folder(conn, args.folder, overwrite=args.force)
+            finally:
+                conn.close()
+            print(f"exported {len(names)} snippet(s) from {db_path} to {args.folder}")
+            return 0
+        items, skipped = read_folder(args.folder)
+        db.init_db(db_path)
+        conn = db.connect(db_path)
+        try:
+            report = db.import_report(conn, items, args.on_duplicate, dry_run=args.dry_run)
+        finally:
+            conn.close()
+    except (FolderError, db.ValidationError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    for rel in skipped:
+        print(f"warning: skipped {rel} (not UTF-8 text)", file=sys.stderr)
+    print(f"{'would import' if args.dry_run else 'imported'} {report['imported']}, "
+          f"skipped {report['skipped']}, replaced {report['replaced']} "
+          f"from {args.folder}" + (" (dry run, nothing saved)" if args.dry_run else ""))
+    return 0
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if args.command in ("export-dir", "import-dir"):
+        return _folder_command(args)
     if args.command == "backup":
         from .db import BackupError, backup
         db_path = args.db or os.environ.get("SNIPVAULT_DB", "snipvault.db")

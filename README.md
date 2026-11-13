@@ -46,6 +46,47 @@ error: database not found: missing.db
 A backup is a normal snipvault database; restore it by pointing `--db` at it
 or copying it back over the original (with the server stopped).
 
+## Folders of files
+
+```
+snipvault export-dir snips [--db FILE] [--force]
+snipvault import-dir snips [--db FILE] [--on-duplicate add|skip|replace] [--dry-run]
+```
+
+`export-dir` writes one file per snippet, named after the title with an
+extension for the language, starting with a small header (title, language,
+tags) followed by the body. It refuses to overwrite existing files without
+`--force`. `import-dir` reads every file under a folder (hidden files and
+non-UTF-8 files are skipped, with a warning); a file without the header is
+imported too, using the file name as title and the extension to guess the
+language. Duplicate handling and `--dry-run` work like the web import. Real
+output from a database with two snippets, with a third plain file
+(`count_rows.sql`) added to the folder before the last import (run in an empty
+temporary directory):
+
+```
+$ snipvault export-dir snips
+exported 2 snippet(s) from snipvault.db to snips
+$ snipvault export-dir snips
+error: 2 file(s) already exist in snips, e.g. reverse-a-list.py (use --force to overwrite)
+$ snipvault import-dir snips --dry-run --on-duplicate skip
+would import 0, skipped 2, replaced 0 from snips (dry run, nothing saved)
+$ snipvault import-dir nope
+error: folder not found: nope
+$ ls snips
+find-big-files.sh
+reverse-a-list.py
+$ cat snips/reverse-a-list.py
+---
+title: Reverse a list
+language: python
+tags: lists, python
+---
+items[::-1]
+$ snipvault import-dir snips --db fresh.db
+imported 3, skipped 0, replaced 0 from snips
+```
+
 ## Security notes
 
 snipvault is a **local-only tool with no login**.
