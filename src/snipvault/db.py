@@ -317,6 +317,38 @@ def export_document(conn):
     return {"format": "snipvault", "version": 1, "snippets": export_all(conn)}
 
 
+def _norm_body(text):
+    return " ".join(text.split())
+
+
+def find_similar(conn, threshold=0.8):
+    """Return pairs of snippets whose bodies are alike, most similar first.
+
+    Similarity is difflib's ratio (0..1) on the bodies with whitespace
+    collapsed. Each pair is {"a", "b", "similarity"} where a and b are
+    {"id", "title", "language"} and a has the lower id."""
+    from difflib import SequenceMatcher
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) \
+            or not 0 < threshold <= 1:
+        raise ValidationError("threshold must be a number above 0 and at most 1")
+    rows = [(r["id"], r["title"], r["language"], _norm_body(r["body"]))
+            for r in conn.execute("SELECT id, title, language, body FROM snippets ORDER BY id")
+            if r["body"].strip()]
+    pairs = []
+    for i, (ida, ta, la, ba) in enumerate(rows):
+        for idb, tb, lb, bb in rows[i + 1:]:
+            m = SequenceMatcher(None, ba, bb, autojunk=False)
+            if m.real_quick_ratio() < threshold or m.quick_ratio() < threshold:
+                continue
+            ratio = m.ratio()
+            if ratio >= threshold:
+                pairs.append({"a": {"id": ida, "title": ta, "language": la},
+                              "b": {"id": idb, "title": tb, "language": lb},
+                              "similarity": round(ratio, 3)})
+    pairs.sort(key=lambda p: (-p["similarity"], p["a"]["id"], p["b"]["id"]))
+    return pairs
+
+
 DUPLICATE_MODES = ("add", "skip", "replace")
 
 

@@ -11,9 +11,8 @@ Ideas for after v0.1, roughly in priority order.
 4. **Command line client.** `snipvault add`, `snipvault get`, `snipvault search`
    talking to the local database or the REST API.
 5. **Import from other tools.** GitHub Gists and plain folders of files.
-6. **Fuzzy duplicate detection** by body similarity, not just title.
-
-Done: `snipvault export-dir` / `import-dir` (folder of files with a small
+Done: fuzzy duplicate detection by body similarity (`snipvault duplicates`,
+`/api/duplicates`); `snipvault export-dir` / `import-dir` (folder of files with a small
 header); optional shared access token (`--token` / `$SNIPVAULT_TOKEN`, login page
 and bearer header) with a "Log out" button in the page header; `snipvault backup` (SQLite backup API); duplicate handling on import
 (`on_duplicate=add|skip|replace`); import dry run (`dry_run=1`); snippet history in the REST API (versions on edit,

@@ -87,6 +87,35 @@ $ snipvault import-dir snips --db fresh.db
 imported 3, skipped 0, replaced 0 from snips
 ```
 
+## Similar snippets
+
+```
+snipvault duplicates [--db FILE] [--threshold 0.8]
+GET /api/duplicates?threshold=0.8
+```
+
+Finds pairs of snippets whose bodies are alike, not just identical titles.
+Similarity is the standard-library `difflib` ratio (0 to 1) on the bodies with
+whitespace collapsed; pairs at or above the threshold are listed, most similar
+first. Empty bodies are ignored. It compares every pair, so it is meant for
+personal-sized collections. Real output from four snippets (run in an empty
+temporary directory; `--threshold 2` fails with exit status 1):
+
+```
+$ snipvault duplicates
+100.0%  #1 Reverse a list (python)  ~  #4 Reverse again (python)
+81.5%  #1 Reverse a list (python)  ~  #2 Reverse (copy) (python)
+81.5%  #2 Reverse (copy) (python)  ~  #4 Reverse again (python)
+3 similar pair(s) at threshold 0.8
+$ snipvault duplicates --threshold 0.99
+100.0%  #1 Reverse a list (python)  ~  #4 Reverse again (python)
+1 similar pair(s) at threshold 0.99
+$ snipvault duplicates --threshold 2
+error: threshold must be a number above 0 and at most 1
+$ GET /api/duplicates?threshold=0.9
+[{"a": {"id": 1, "language": "python", "title": "Reverse a list"}, "b": {"id": 4, "language": "python", "title": "Reverse again"}, "similarity": 1.0}]
+```
+
 ## Security notes
 
 snipvault is a **local-only tool with no login**.

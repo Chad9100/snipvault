@@ -40,7 +40,34 @@ def build_parser():
     i.add_argument("--on-duplicate", choices=("add", "skip", "replace"), default="add",
                    help="what to do with a same title and language (default: add)")
     i.add_argument("--dry-run", action="store_true", help="show the result without saving")
+    d = sub.add_parser("duplicates", help="list snippets with similar bodies")
+    d.add_argument("--db", default=None,
+                   help="database file (default: $SNIPVAULT_DB or ./snipvault.db)")
+    d.add_argument("--threshold", type=float, default=0.8,
+                   help="minimum similarity, above 0 and at most 1 (default: 0.8)")
     return p
+
+
+def _duplicates_command(args):
+    from . import db
+    db_path = args.db or os.environ.get("SNIPVAULT_DB", "snipvault.db")
+    if not os.path.exists(db_path):
+        print(f"error: database not found: {db_path}", file=sys.stderr)
+        return 1
+    conn = db.connect(db_path)
+    try:
+        pairs = db.find_similar(conn, args.threshold)
+    except db.ValidationError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    finally:
+        conn.close()
+    for p in pairs:
+        a, b = p["a"], p["b"]
+        print(f"{p['similarity'] * 100:.1f}%  #{a['id']} {a['title']} ({a['language']})"
+              f"  ~  #{b['id']} {b['title']} ({b['language']})")
+    print(f"{len(pairs)} similar pair(s) at threshold {args.threshold:g}")
+    return 0
 
 
 def _folder_command(args):
@@ -78,6 +105,8 @@ def _folder_command(args):
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if args.command == "duplicates":
+        return _duplicates_command(args)
     if args.command in ("export-dir", "import-dir"):
         return _folder_command(args)
     if args.command == "backup":

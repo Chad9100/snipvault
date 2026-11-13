@@ -118,6 +118,16 @@ def import_():
     return jsonify(report), (200 if dry else 201)
 
 
+@bp.get("/duplicates")
+def duplicates():
+    raw = request.args.get("threshold", "0.8")
+    try:
+        threshold = float(raw)
+    except ValueError:
+        raise db.ValidationError("threshold must be a number above 0 and at most 1") from None
+    return jsonify(db.find_similar(get_conn(), threshold))
+
+
 @bp.get("/tags")
 def tags():
     return jsonify([{"tag": t, "count": n} for t, n in db.tag_counts(get_conn())])
